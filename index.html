@@ -105,6 +105,10 @@
       const BASE_MAX_ROTATION = 8; // Базовый максимальный поворот головы в градусах
       const MIN_MAX_ROTATION = 7; // Минимальный максимальный поворот головы в градусах
       
+      // Калибровочные настройки для точного слежения за курсором
+      const CURSOR_OFFSET_X = 0; // Смещение курсора по X (положительное = правее, отрицательное = левее)
+      const CURSOR_OFFSET_Y = 300; // Смещение курсора по Y (положительное = ниже, отрицательное = выше)
+      
       // Текущие значения смещения (будут плавно изменяться при скролле)
       let currentOffsetX = HEAD_OFFSET_X;
       let currentOffsetY = HEAD_OFFSET_Y;
@@ -192,9 +196,13 @@
           const centerX = window.innerWidth / 2;
           const centerY = window.innerHeight / 2;
           
+          // Применяем калибровочные смещения к позиции курсора
+          const calibratedMouseX = mouseX + CURSOR_OFFSET_X;
+          const calibratedMouseY = mouseY + CURSOR_OFFSET_Y;
+          
           // Нормализуем координаты мыши от -1 до 1
-          const normalizedX = (mouseX - centerX) / centerX;
-          const normalizedY = (mouseY - centerY) / centerY;
+          const normalizedX = (calibratedMouseX - centerX) / centerX;
+          const normalizedY = (calibratedMouseY - centerY) / centerY;
           
           // Динамически изменяем максимальный поворот в зависимости от масштаба
           // Чем больше голова, тем меньше она поворачивается
