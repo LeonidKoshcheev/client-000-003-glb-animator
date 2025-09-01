@@ -88,7 +88,7 @@
       scene.background = null;
 
       // Настройки модели
-      const MODEL_SCALE = 4; // Масштаб модели (5 = стандартный размер)
+      const MODEL_SCALE = 5; // Масштаб модели (5 = стандартный размер)
 
       const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 1000);
       camera.position.set(0, 0, 30);
@@ -103,6 +103,15 @@
       renderer.toneMapping = THREE.NeutralToneMapping;
       renderer.toneMappingExposure = 1.7;
 
+      // Фиксируем рендер поверх всего контента
+      renderer.domElement.style.position = 'fixed';
+      renderer.domElement.style.top = '0';
+      renderer.domElement.style.left = '0';
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
+      renderer.domElement.style.zIndex = '10';
+      renderer.domElement.style.pointerEvents = 'none'; // Позволяет кликать сквозь рендер
+      
       document.body.appendChild(renderer.domElement);
 
       // Настройка освещения
@@ -338,5 +347,30 @@
       // Добавляем обработчик движения мыши
       document.addEventListener('mousemove', onMouseMove);
     </script>
+    
+    <!-- Контент с двумя экранами для вертикального скролла -->
+    <div style="overflow-y: auto; height: 100vh; scroll-snap-type: y mandatory; position: relative; z-index: 0;">
+      
+      <!-- Экран 1 - Основной с 3D моделью -->
+      <div style="min-height: 100vh; height: 100vh; width: 100vw; scroll-snap-align: start; position: relative; background: #000A25;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; z-index: 100; pointer-events: none;">
+          <h1 style="margin: 0; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">Экран 1</h1>
+          <p style="font-size: 24px; margin: 10px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">3D Модель с поворотом головы</p>
+        </div>
+      </div>
+      
+      <!-- Экран 2 - Дополнительный контент -->
+      <div style="min-height: 100vh; height: 100vh; width: 100vw; scroll-snap-align: start; background: linear-gradient(135deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; color: white; position: relative;">
+        <div style="text-align: center; padding: 40px; z-index: 100;">
+          <h1 style="font-size: 48px; margin-bottom: 20px;">Экран 2</h1>
+          <p style="font-size: 24px; margin-bottom: 30px;">Дополнительный контент</p>
+          <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); max-width: 600px;">
+            <h2 style="margin: 0 0 20px 0; color: #4CAF50;">Информация</h2>
+            <p style="margin: 0; line-height: 1.6; font-size: 18px;">Здесь можно разместить дополнительный контент. 3D модель остается видимой на всех экранах благодаря фиксированному позиционированию.</p>
+          </div>
+        </div>
+      </div>
+      
+    </div>
   </body>
 </html>
