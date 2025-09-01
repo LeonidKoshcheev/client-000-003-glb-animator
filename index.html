@@ -99,7 +99,7 @@
       
       // Целевые значения смещения при скроллинге ко второму экрану
       const TARGET_OFFSET_X = 0; // Целевое смещение головы по X (по центру)
-      const TARGET_OFFSET_Y = 0; // Целевое смещение головы по Y (по центру)
+      const TARGET_OFFSET_Y = 5; // Целевое смещение головы по Y (по центру)
       
       // Текущие значения смещения (будут плавно изменяться при скролле)
       let currentOffsetX = HEAD_OFFSET_X;
@@ -123,6 +123,10 @@
           camera.position.y = currentOffsetY;
           originalCameraPosition.x = currentOffsetX;
           originalCameraPosition.y = currentOffsetY;
+          
+          // Обновляем точку, на которую смотрит камера
+          camera.lookAt(currentOffsetX, currentOffsetY, 0);
+          
           console.log('Камера смещена для компенсации смещения модели по X и Y');
         }
       }
@@ -211,8 +215,8 @@
         // Поворот вверх/вниз (по X) - изменяем Y позицию камеры, увеличиваем амплитуду
         camera.position.y = originalCameraPosition.y + headRotationCurrent.x * distance * 0.6;
         
-        // Поворачиваем камеру лицом к центру (камера уже смещена)
-        camera.lookAt(0, 0, 0);
+        // Поворачиваем камеру лицом к текущей позиции модели
+        camera.lookAt(currentOffsetX, currentOffsetY, 0);
         
         // Обновляем контролы
         controls.update();
@@ -277,7 +281,7 @@
         headRotationTarget.x = 0;
         headRotationTarget.y = 0;
         
-        camera.lookAt(0, 0, 0);
+        camera.lookAt(currentOffsetX, currentOffsetY, 0);
         controls.update();
         console.log('Голова повернута на 15° в сторону');
       }
@@ -445,6 +449,12 @@
           // Применяем смещение к модели
           model.position.x = currentOffsetX;
           model.position.y = currentOffsetY;
+          
+          // Обновляем позицию камеры для компенсации смещения
+          camera.position.x = currentOffsetX;
+          camera.position.y = currentOffsetY;
+          originalCameraPosition.x = currentOffsetX;
+          originalCameraPosition.y = currentOffsetY;
           
           // Отладочная информация (только при изменении смещения)
           if (Math.abs(previousOffsetX - currentOffsetX) > 0.001 || Math.abs(previousOffsetY - currentOffsetY) > 0.001) {
