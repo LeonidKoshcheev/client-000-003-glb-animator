@@ -90,6 +90,9 @@
       const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 1000);
       camera.position.set(0, 0, 30);
 
+      // Сохраняем исходную позицию камеры для функции поворота головы
+      const originalCameraPosition = { x: 0, y: 0, z: 30 };
+
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.outputEncoding = THREE.sRGBEncoding;
@@ -112,6 +115,14 @@
       const clock = new THREE.Clock();
       let actions = {};
       
+      // Переменные для отслеживания мыши
+      let mouseX = 0;
+      let mouseY = 0;
+      let isMouseMoving = false;
+      let mouseTimeout = null;
+      let headRotationTarget = { x: 0, y: 0 };
+      let headRotationCurrent = { x: 0, y: 0 };
+      
       // Настройки анимаций
       const animationSettings = {
         'Morganie':  { additive: true,  weight: 1.0 },
@@ -119,17 +130,111 @@
         'Povorotes': { additive: true,  weight: 1.0 }
       };
 
+      // Функция поворота головы в сторону курсора
+      function updateHeadRotation() {
+        if (!isMouseMoving) {
+          // Плавно возвращаем голову в исходное положение
+          headRotationTarget.x = 0;
+          headRotationTarget.y = 0;
+        } else {
+          // Вычисляем поворот головы в зависимости от позиции курсора
+          const centerX = window.innerWidth / 2;
+          const centerY = window.innerHeight / 2;
+          
+          // Нормализуем координаты мыши от -1 до 1
+          const normalizedX = (mouseX - centerX) / centerX;
+          const normalizedY = (mouseY - centerY) / centerY;
+          
+          // Ограничиваем максимальный поворот (в радианах) - увеличиваем амплитуду
+          const maxRotation = THREE.MathUtils.degToRad(30);
+          headRotationTarget.x = normalizedY * maxRotation; // Исправляем поворот вверх/вниз
+          headRotationTarget.y = -normalizedX * maxRotation;  // Поворот влево/вправо
+        }
+        
+        // Плавно интерполируем текущий поворот к целевому
+        const lerpFactor = 0.05;
+        headRotationCurrent.x += (headRotationTarget.x - headRotationCurrent.x) * lerpFactor;
+        headRotationCurrent.y += (headRotationTarget.y - headRotationCurrent.y) * lerpFactor;
+        
+        // Применяем поворот, двигая камеру вокруг модели
+        const distance = Math.sqrt(originalCameraPosition.x ** 2 + originalCameraPosition.z ** 2);
+        const baseAngle = Math.atan2(originalCameraPosition.x, originalCameraPosition.z);
+        
+        // Поворот влево/вправо (по Y) - вокруг оси Y
+        const newAngleY = baseAngle + headRotationCurrent.y;
+        camera.position.x = distance * Math.sin(newAngleY);
+        camera.position.z = distance * Math.cos(newAngleY);
+        
+        // Поворот вверх/вниз (по X) - изменяем Y позицию камеры, увеличиваем амплитуду
+        camera.position.y = originalCameraPosition.y + headRotationCurrent.x * distance * 0.6;
+        
+        // Поворачиваем камеру лицом к центру
+        camera.lookAt(0, 0, 0);
+        
+        // Обновляем контролы
+        controls.update();
+      }
+
+      // Обработчики событий мыши
+      function onMouseMove(event) {
+        mouseX = event.clientX;
+        mouseY = event.clientY;
+        
+        if (!isMouseMoving) {
+          isMouseMoving = true;
+          
+          // Останавливаем анимацию поворотов
+          const turnAction = actions['Povorotes'];
+          if (turnAction && turnAction.isRunning()) {
+            turnAction.stop();
+            const button = document.getElementById('turnAnimationButton');
+            if (button) {
+              button.textContent = 'Запустить повороты';
+              button.classList.remove('playing');
+            }
+          }
+        }
+        
+        // Сбрасываем таймер
+        if (mouseTimeout) {
+          clearTimeout(mouseTimeout);
+        }
+        
+        // Устанавливаем таймер для остановки движения мыши
+        mouseTimeout = setTimeout(() => {
+          isMouseMoving = false;
+          
+          // Запускаем анимацию поворотов обратно
+          const turnAction = actions['Povorotes'];
+          if (turnAction) {
+            turnAction.reset().play();
+            const button = document.getElementById('turnAnimationButton');
+            if (button) {
+              button.textContent = 'Остановить повороты';
+              button.classList.add('playing');
+            }
+          }
+        }, 1000); // 1 секунда задержки
+      }
+
       // Функция поворота головы в сторону
       function resetHeadPosition() {
         const rotationSpeed = THREE.MathUtils.degToRad(15);
-        const distance = Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2);
-        const currentAngle = Math.atan2(camera.position.x, camera.position.z);
-        const newAngle = currentAngle + rotationSpeed;
+        const distance = Math.sqrt(originalCameraPosition.x ** 2 + originalCameraPosition.z ** 2);
+        const baseAngle = Math.atan2(originalCameraPosition.x, originalCameraPosition.z);
+        const newAngle = baseAngle + rotationSpeed;
         
         camera.position.x = distance * Math.sin(newAngle);
         camera.position.z = distance * Math.cos(newAngle);
-        camera.lookAt(0, 0, 0);
+        camera.position.y = originalCameraPosition.y; // Возвращаем в исходную Y позицию
         
+        // Сбрасываем поворот головы
+        headRotationCurrent.x = 0;
+        headRotationCurrent.y = 0;
+        headRotationTarget.x = 0;
+        headRotationTarget.y = 0;
+        
+        camera.lookAt(0, 0, 0);
         controls.update();
         console.log('Голова повернута на 15° в сторону');
       }
@@ -211,6 +316,10 @@
         const delta = clock.getDelta();
         
         if (mixer) mixer.update(delta);
+        
+        // Обновляем поворот головы
+        updateHeadRotation();
+        
         controls.update();
         renderer.render(scene, camera);
       }
@@ -222,6 +331,9 @@
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
+
+      // Добавляем обработчик движения мыши
+      document.addEventListener('mousemove', onMouseMove);
     </script>
   </body>
 </html>
