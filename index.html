@@ -88,7 +88,10 @@
       scene.background = null;
 
       // Настройки модели
-      const MODEL_SCALE = 5; // Масштаб модели (5 = стандартный размер)
+      const MODEL_SCALE_BASE = 10; // Базовый масштаб модели (5 = стандартный размер)
+      let currentModelScale = MODEL_SCALE_BASE; // Текущий масштаб модели
+      let targetModelScale = MODEL_SCALE_BASE; // Целевой масштаб модели
+      let model = null; // Ссылка на загруженную модель
 
       const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 1000);
       camera.position.set(0, 0, 30);
@@ -272,6 +275,34 @@
         }
       }
 
+      // Функция обработки скролла для изменения масштаба модели
+      function handleScroll() {
+        const scrollContainer = document.getElementById('scrollContainer') || document.querySelector('div[style*="overflow-y: auto"]');
+        if (!scrollContainer) {
+          console.log('Контейнер скролла не найден');
+          return;
+        }
+        
+        const scrollTop = scrollContainer.scrollTop;
+        const windowHeight = window.innerHeight;
+        
+        // Вычисляем прогресс скролла от 0 до 1
+        // 0 = начало первого экрана, 1 = начало второго экрана
+        const scrollProgress = Math.min(scrollTop / windowHeight, 1);
+        
+        // Плавно изменяем масштаб от базового до минимального
+        // При скролле ко второму экрану модель уменьшается
+        const minScale = 0.3; // Минимальный масштаб (30% от исходного)
+        targetModelScale = MODEL_SCALE_BASE * (1 - scrollProgress * (1 - minScale));
+        
+        // Ограничиваем масштаб
+        targetModelScale = Math.max(targetModelScale, MODEL_SCALE_BASE * minScale);
+        targetModelScale = Math.min(targetModelScale, MODEL_SCALE_BASE);
+        
+        // Отладочная информация
+        console.log(`Скролл: ${scrollTop}px, Прогресс: ${scrollProgress.toFixed(2)}, Целевой масштаб: ${targetModelScale.toFixed(2)}`);
+      }
+
       // Функция воспроизведения анимации
       function playAnimation(name) {
         const action = actions[name];
@@ -286,8 +317,9 @@
       const loader = new THREE.GLTFLoader();
       loader.load('model.glb',
         (gltf) => {
-          gltf.scene.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
-          scene.add(gltf.scene);
+          model = gltf.scene; // Сохраняем ссылку на модель
+          model.scale.set(MODEL_SCALE_BASE, MODEL_SCALE_BASE, MODEL_SCALE_BASE);
+          scene.add(model);
           
           mixer = new THREE.AnimationMixer(gltf.scene);
 
@@ -329,6 +361,19 @@
         
         if (mixer) mixer.update(delta);
         
+        // Плавно изменяем масштаб модели
+        if (model) {
+          const lerpFactor = 0.05; // Скорость изменения масштаба
+          const previousScale = currentModelScale;
+          currentModelScale += (targetModelScale - currentModelScale) * lerpFactor;
+          model.scale.set(currentModelScale, currentModelScale, currentModelScale);
+          
+          // Отладочная информация (только при изменении масштаба)
+          if (Math.abs(previousScale - currentModelScale) > 0.001) {
+            console.log(`Масштаб изменен: ${currentModelScale.toFixed(2)} (цель: ${targetModelScale.toFixed(2)})`);
+          }
+        }
+        
         // Обновляем поворот головы
         updateHeadRotation();
         
@@ -346,10 +391,23 @@
 
       // Добавляем обработчик движения мыши
       document.addEventListener('mousemove', onMouseMove);
+      
+      // Добавляем обработчик скролла для изменения масштаба модели
+      // Ждем загрузки DOM, затем привязываем к контейнеру скролла
+      window.addEventListener('load', () => {
+        const scrollContainer = document.getElementById('scrollContainer');
+        if (scrollContainer) {
+          scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+          console.log('Обработчик скролла привязан к контейнеру:', scrollContainer);
+        } else {
+          console.log('Контейнер скролла не найден, привязываем к window');
+          window.addEventListener('scroll', handleScroll, { passive: true });
+        }
+      });
     </script>
     
     <!-- Контент с двумя экранами для вертикального скролла -->
-    <div style="overflow-y: auto; height: 100vh; scroll-snap-type: y mandatory; position: relative; z-index: 0;">
+    <div id="scrollContainer" style="overflow-y: auto; height: 100vh; scroll-snap-type: y mandatory; position: relative; z-index: 0;">
       
       <!-- Экран 1 - Основной с 3D моделью -->
       <div style="min-height: 100vh; height: 100vh; width: 100vw; scroll-snap-align: start; position: relative; background: #000A25;">
