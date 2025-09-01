@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Управление головой модели</title>
+    <style>
+      /* Сброс отступов и установка градиентного фона */
+      body {
+        margin: 0;
+        background: linear-gradient(to bottom, #000A25, #000A25);
+        font-family: Arial, sans-serif;
+      }
+      
+      /* Убираем отступы у canvas */
+      canvas {
+        display: block;
+      }
+      
+      /* Стили для кнопок управления */
+      .controls {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .control-btn {
+        padding: 15px 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        border: 2px solid #4a90e2;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        min-width: 250px;
+      }
+      
+      .control-btn:hover {
+        background: rgba(74, 144, 226, 0.4);
+        border-color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+      }
+      
+      .control-btn.active {
+        background: rgba(74, 144, 226, 0.7);
+        border-color: #fff;
+        box-shadow: 0 0 20px rgba(74, 144, 226, 0.5);
+      }
+      
+      .status-indicator {
+        padding: 15px 20px;
+        background: rgba(0, 255, 0, 0.2);
+        color: #00ff00;
+        border: 2px solid #00ff00;
+        border-radius: 8px;
+        font-size: 16px;
+        text-align: center;
+        margin-top: 20px;
+        font-weight: bold;
+      }
+      
+      .status-indicator.paused {
+        background: rgba(255, 0, 0, 0.2);
+        color: #ff0000;
+        border-color: #ff0000;
+      }
+      
+      .title {
+        color: white;
+        text-align: center;
+        margin: 20px 0;
+        font-size: 24px;
+        font-weight: bold;
+        text-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="title">🎯 Управление головой модели</h1>
+    
+    <!-- Кнопки управления для тестирования -->
+    <div class="controls">
+      <button class="control-btn" onclick="resetHeadPosition()">📍 Сброс позиции головы</button>
+      <button class="control-btn" onclick="hideGroup('Golova')">👻 Скрыть группу "Golova"</button>
+      <button class="control-btn" onclick="hideGroup('Body')">👻 Скрыть группу "Body"</button>
+      <button class="control-btn" onclick="hideGroup('Arms')">👻 Скрыть группу "Arms"</button>
+      <button class="control-btn" onclick="hideGroup('Legs')">👻 Скрыть группу "Legs"</button>
+      <button class="control-btn" onclick="restoreAllGroups()">🔄 Восстановить все группы</button>
+      <button class="control-btn" onclick="analyzeGroups()">🔍 Анализ групп</button>
+      <button class="control-btn" onclick="testModules()">🧪 Тест модулей</button>
+      <div class="status-indicator" id="statusIndicator">🔄 Готов к работе</div>
+    </div>
+    
+    <!-- Подключение библиотеки Three.js для 3D графики -->
+    <script type="module">
+      import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+      import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+      import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+      
+      // Делаем THREE доступным глобально для совместимости
+      window.THREE = THREE;
+      window.OrbitControls = OrbitControls;
+      window.GLTFLoader = GLTFLoader;
+    </script>
+
+    <script>
+      // ===== СОЗДАНИЕ ОСНОВНЫХ КОМПОНЕНТОВ СЦЕНЫ =====
+      
+      // Создаем новую 3D сцену
+      const scene = new THREE.Scene();
+      // Убираем фон сцены (будет виден градиент из CSS)
+      scene.background = null;
+
+      // Создаем перспективную камеру с углом обзора 50°, соотношением сторон экрана и диапазоном видимости 1-1000
+      const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+      // Устанавливаем позицию камеры в точке (0, 0, 30)
+      camera.position.set(0, 0, 20);
+
+      // Создаем WebGL рендерер с антиалиасингом
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      // Устанавливаем размер рендерера равным размеру окна
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      // Добавляем рендерер в DOM
+      document.body.appendChild(renderer.domElement);
+
+      // Создаем OrbitControls для управления камерой мышью
+      const controls = new OrbitControls(camera, renderer.domElement);
+      // Включаем плавное перемещение камеры
+      controls.enableDamping = true;
+      // Устанавливаем коэффициент затухания для плавности
+      controls.dampingFactor = 0.05;
+
+      // ===== ОСВЕЩЕНИЕ СЦЕНЫ =====
+      
+      // Создаем направленный свет (как солнце)
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      // Устанавливаем позицию света
+      directionalLight.position.set(10, 10, 5);
+      // Добавляем свет в сцену
+      scene.add(directionalLight);
+
+      // Создаем окружающий свет для мягкого освещения
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+      // Добавляем окружающий свет в сцену
+      scene.add(ambientLight);
+
+      // ===== ЗАГРУЗКА МОДЕЛИ =====
+      
+      // Создаем загрузчик GLTF моделей
+      const loader = new GLTFLoader();
+      
+      // Переменные для хранения объектов головы
+      let headGroup = null;
+      let headMesh = null;
+      let eyePlane = null;
+      let allEyePlanes = [];
+
+      // Загружаем модель из файла model.glb
+      console.log('🚀 Начинаем загрузку модели...');
+      loader.load('model.glb',
+        // Функция успешной загрузки
+        (gltf) => {
+          console.log('🎬 Модель загружена, настраиваем...');
+          
+          // Масштабируем модель в 5 раз по всем осям
+          gltf.scene.scale.set(5, 5, 5);
+          
+          // Добавляем модель в сцену
+          scene.add(gltf.scene);
+
+          // Ищем группу головы и анализируем структуру
+          gltf.scene.traverse((obj) => {
+            if (obj.type === 'Group') {
+              console.log(`👥 Найдена группа: "${obj.name}" с ${obj.children.length} детьми`);
+              
+              if (obj.name === 'Golova') {
+                headGroup = obj;
+                console.log('🎭 Найдена группа головы:', obj.name);
+              }
+            } else if (obj.type === 'Mesh') {
+              console.log(`📦 Найден меш: "${obj.name}"`);
+            }
+          });
+
+          console.log('✅ Модель загружена и настроена успешно');
+          updateStatusIndicator('✅ Модель загружена');
+        },
+        // Функция прогресса загрузки
+        (progress) => {
+          const percent = (progress.loaded / progress.total * 100).toFixed(0);
+          console.log(`📥 Загрузка модели: ${percent}%`);
+          updateStatusIndicator(`📥 Загрузка: ${percent}%`);
+        },
+        // Функция обработки ошибок
+        (error) => {
+          console.error('❌ Ошибка загрузки модели:', error);
+          updateStatusIndicator('❌ Ошибка загрузки модели');
+          
+          // Показываем подробности ошибки
+          if (error.message.includes('404')) {
+            console.error('💡 Возможно, файл model.glb не найден. Убедитесь, что он находится в той же папке, что и HTML файл.');
+            updateStatusIndicator('❌ Файл model.glb не найден');
+          } else if (error.message.includes('CORS')) {
+            console.error('💡 Проблема с CORS. Откройте файл через локальный сервер (например, Live Server в VS Code).');
+            updateStatusIndicator('❌ Ошибка CORS - используйте локальный сервер');
+          }
+        }
+      );
+
+      // ===== ГЛАВНЫЙ ЦИКЛ АНИМАЦИИ =====
+      
+      // Функция анимации, которая выполняется каждый кадр
+      function animate() {
+        // Запрашиваем следующий кадр анимации
+        requestAnimationFrame(animate);
+        
+        // Обновляем OrbitControls
+        controls.update();
+        
+        // Рендерим сцену
+        renderer.render(scene, camera);
+      }
+
+      // Запускаем анимацию
+      animate();
+
+      // ===== ФУНКЦИИ УПРАВЛЕНИЯ =====
+      
+      // Функция для сброса позиции головы
+      function resetHeadPosition() {
+        console.log('📍 Сбрасываем позицию головы...');
+        
+        // Сбрасываем позицию группы головы
+        if (headGroup) {
+          headGroup.position.set(0, 0, 0);
+          console.log('✅ Позиция группы головы сброшена');
+        }
+        
+        // Сбрасываем позицию меша головы
+        if (headMesh) {
+          headMesh.position.set(0, 0, 0);
+          console.log('✅ Позиция меша головы сброшена');
+        }
+        
+        // Сбрасываем позицию всех пластин глаз
+        if (allEyePlanes.length > 0) {
+          allEyePlanes.forEach((plane, index) => {
+            plane.position.set(0, 0, 0);
+          });
+          console.log(`✅ Позиция ${allEyePlanes.length} пластин для глаз сброшена`);
+        } else if (eyePlane) {
+          // Fallback для обратной совместимости
+          eyePlane.position.set(0, 0, 0);
+          console.log('✅ Позиция пластины глаз сброшена');
+        } else {
+          console.log('⚠️ Пластины глаз не найдены');
+        }
+        
+        if (!headGroup && !headMesh && !eyePlane) {
+          console.log('❌ Не найдены объекты головы для сброса позиции');
+        }
+        
+        // Обновляем статус
+        updateStatusIndicator('✅ Позиция головы сброшена');
+      }
+
+      // Функция для скрытия группы по имени
+      function hideGroup(groupName) {
+        console.log(`👻 Скрываем группу "${groupName}"...`);
+        
+        let found = false;
+        
+        scene.traverse((obj) => {
+          if (obj.type === 'Group' && obj.name === groupName) {
+            // Сохраняем оригинальную видимость
+            if (!obj.userData.originalVisible) {
+              obj.userData.originalVisible = obj.visible;
+            }
+            
+            // Скрываем группу
+            obj.visible = false;
+            found = true;
+            
+            console.log(`👻 Скрыта группа: "${obj.name}"`);
+          }
+        });
+        
+        if (found) {
+          updateStatusIndicator(`👻 Скрыта группа "${groupName}"`);
+        } else {
+          console.log(`❌ Группа "${groupName}" не найдена`);
+          updateStatusIndicator(`❌ Группа "${groupName}" не найдена`);
+        }
+      }
+
+      // Функция для обновления индикатора состояния
+      function updateStatusIndicator(message) {
+        const statusIndicator = document.getElementById('statusIndicator');
+        if (statusIndicator) {
+          statusIndicator.textContent = message;
+          
+          // Меняем цвет в зависимости от типа сообщения
+          if (message.includes('✅')) {
+            statusIndicator.className = 'status-indicator';
+          } else if (message.includes('👻')) {
+            statusIndicator.className = 'status-indicator paused';
+          } else if (message.includes('❌')) {
+            statusIndicator.className = 'status-indicator paused';
+          }
+        }
+      }
+
+      // Функция для восстановления всех скрытых групп
+      function restoreAllGroups() {
+        console.log('🔄 Восстанавливаем все скрытые группы...');
+        
+        const restoredGroups = [];
+        
+        scene.traverse((obj) => {
+          if (obj.type === 'Group' && obj.userData.originalVisible !== undefined) {
+            // Восстанавливаем оригинальную видимость
+            obj.visible = obj.userData.originalVisible;
+            restoredGroups.push(obj.name);
+            
+            console.log(`🔄 Восстановлена группа: "${obj.name}" (видимость: ${obj.visible})`);
+          }
+        });
+        
+        if (restoredGroups.length > 0) {
+          console.log(`✅ Восстановлено ${restoredGroups.length} групп:`, restoredGroups);
+          updateStatusIndicator(`🔄 Восстановлено ${restoredGroups.length} групп`);
+        } else {
+          console.log('ℹ️ Нет скрытых групп для восстановления');
+          updateStatusIndicator('ℹ️ Нет скрытых групп');
+        }
+      }
+
+      // Делаем функции доступными глобально
+      // Функция для анализа содержимого групп
+      function analyzeGroups() {
+        console.log('🔍 === АНАЛИЗ СОДЕРЖИМОГО ГРУПП ===');
+        
+        let groupCount = 0;
+        let meshCount = 0;
+        
+        scene.traverse((obj) => {
+          if (obj.type === 'Group') {
+            groupCount++;
+            console.log(`\n👥 Группа ${groupCount}: "${obj.name}"`);
+            console.log(`   Дети: ${obj.children.length}`);
+            console.log(`   Видимость: ${obj.visible}`);
+            
+            // Анализируем детей группы
+            obj.children.forEach((child, index) => {
+              if (child.type === 'Mesh') {
+                meshCount++;
+                console.log(`   👶 ${index + 1}. Меш: "${child.name}" | Видимость: ${child.visible}`);
+                
+                // Проверяем, является ли это потенциальной пластиной глаз
+                const isPotentialEyePlane = 
+                  child.name.toLowerCase().includes('plane') ||
+                  child.name.toLowerCase().includes('eye') ||
+                  child.name.toLowerCase().includes('lid') ||
+                  child.name.toLowerCase().includes('plate') ||
+                  child.name.toLowerCase().includes('cover') ||
+                  child.name.toLowerCase().includes('mask') ||
+                  child.name.toLowerCase().includes('visor') ||
+                  child.name.toLowerCase().includes('screen') ||
+                  child.name.toLowerCase().includes('display') ||
+                  child.name.toLowerCase().includes('panel') ||
+                  child.name.toLowerCase().includes('block') ||
+                  child.name.toLowerCase().includes('cube') ||
+                  child.name.toLowerCase().includes('box') ||
+                  child.name.toLowerCase().includes('rect') ||
+                  child.name.toLowerCase().includes('dark') ||
+                  child.name.toLowerCase().includes('blue');
+                
+                if (isPotentialEyePlane) {
+                  console.log(`      🎯 ВОЗМОЖНО ЭТО ПЛАСТИНА ГЛАЗ!`);
+                }
+              } else if (child.type === 'Group') {
+                console.log(`   👶 ${index + 1}. Подгруппа: "${child.name}" | Дети: ${child.children.length}`);
+              }
+            });
+          }
+        });
+        
+        console.log(`\n📊 ИТОГО: ${groupCount} групп, ${meshCount} мешей`);
+        console.log('🔍 === КОНЕЦ АНАЛИЗА ===');
+        
+        updateStatusIndicator(`🔍 Проанализировано: ${groupCount} групп, ${meshCount} мешей`);
+      }
+
+      // Функция для тестирования загруженных модулей
+      function testModules() {
+        console.log('🧪 === ТЕСТИРОВАНИЕ МОДУЛЕЙ ===');
+        
+        const modules = {
+          'THREE': typeof THREE !== 'undefined',
+          'OrbitControls': typeof OrbitControls !== 'undefined',
+          'GLTFLoader': typeof GLTFLoader !== 'undefined'
+        };
+        
+        console.log('📦 Статус модулей:', modules);
+        
+        let allLoaded = true;
+        Object.entries(modules).forEach(([name, loaded]) => {
+          if (loaded) {
+            console.log(`✅ ${name}: загружен`);
+          } else {
+            console.log(`❌ ${name}: НЕ загружен`);
+            allLoaded = false;
+          }
+        });
+        
+        if (allLoaded) {
+          console.log('🎉 Все модули загружены успешно!');
+          updateStatusIndicator('🎉 Все модули загружены');
+        } else {
+          console.log('⚠️ Некоторые модули не загружены');
+          updateStatusIndicator('⚠️ Не все модули загружены');
+        }
+        
+        console.log('🧪 === КОНЕЦ ТЕСТА ===');
+      }
+
+      window.resetHeadPosition = resetHeadPosition;
+      window.hideGroup = hideGroup;
+      window.restoreAllGroups = restoreAllGroups;
+      window.analyzeGroups = analyzeGroups;
+      window.testModules = testModules;
+
+      // ===== ОБРАБОТКА ИЗМЕНЕНИЯ РАЗМЕРА ОКНА =====
+      
+      // Функция для изменения размера рендерера при изменении размера окна
+      function onWindowResize() {
+        // Обновляем размер камеры
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        
+        // Обновляем размер рендерера
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // Добавляем обработчик изменения размера окна
+      window.addEventListener('resize', onWindowResize, false);
+
+      // Проверяем, что все модули загружены
+      if (typeof THREE !== 'undefined' && typeof OrbitControls !== 'undefined' && typeof GLTFLoader !== 'undefined') {
+        console.log('🎯 Система управления головой готова к работе!');
+        updateStatusIndicator('🎯 Система готова к работе');
+      } else {
+        console.error('❌ Не все модули загружены!');
+        updateStatusIndicator('❌ Ошибка загрузки модулей');
+      }
+    </script>
+  </body>
+</html>

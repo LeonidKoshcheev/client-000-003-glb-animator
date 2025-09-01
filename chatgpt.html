@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Голова с кнопками</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 1;
+    }
+    .controls button {
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="controls">
+  <button id="reset">Сброс позиции</button>
+  <button id="hideGroups">Скрыть внешние группы</button>
+  <button id="showAll">Показать всё</button>
+  <button id="rotate">Вращать</button>
+  <button id="stopRotate">Остановить</button>
+</div>
+
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
+  import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/GLTFLoader.js';
+  import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/controls/OrbitControls.js';
+
+  let scene = new THREE.Scene();
+  let camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 1.5, 3);
+
+  let renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+
+  let model;
+  const loader = new GLTFLoader();
+  loader.load('model.glb', function (gltf) {
+    model = gltf.scene;
+    model.position.set(0, 0, 0);
+    scene.add(model);
+  });
+
+  const light = new THREE.AmbientLight(0xffffff, 1);
+  scene.add(light);
+
+  let animateRotation = false;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    if (model && animateRotation) {
+      model.rotation.y += 0.01;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // === Кнопки ===
+  document.getElementById('reset').addEventListener('click', () => {
+    if (model) {
+      model.position.set(0, 0, 0);
+      model.rotation.set(0, 0, 0);
+    }
+  });
+
+  document.getElementById('hideGroups').addEventListener('click', () => {
+    if (model) {
+      model.traverse(child => {
+        if (child.isMesh || child.isGroup) {
+          // Скрываем все, кроме тех, у кого в имени "plate" (например)
+          if (!child.name.toLowerCase().includes('plate')) {
+            child.visible = false;
+          }
+        }
+      });
+    }
+  });
+
+  document.getElementById('showAll').addEventListener('click', () => {
+    if (model) {
+      model.traverse(child => {
+        child.visible = true;
+      });
+    }
+  });
+
+  document.getElementById('rotate').addEventListener('click', () => {
+    animateRotation = true;
+  });
+
+  document.getElementById('stopRotate').addEventListener('click', () => {
+    animateRotation = false;
+  });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+
+</body>
+</html>
