@@ -101,6 +101,10 @@
       const TARGET_OFFSET_X = 0; // Целевое смещение головы по X (по центру)
       const TARGET_OFFSET_Y = 5; // Целевое смещение головы по Y (по центру)
       
+      // Настройки поворота головы
+      const BASE_MAX_ROTATION = 8; // Базовый максимальный поворот головы в градусах
+      const MIN_MAX_ROTATION = 7; // Минимальный максимальный поворот головы в градусах
+      
       // Текущие значения смещения (будут плавно изменяться при скролле)
       let currentOffsetX = HEAD_OFFSET_X;
       let currentOffsetY = HEAD_OFFSET_Y;
@@ -192,8 +196,12 @@
           const normalizedX = (mouseX - centerX) / centerX;
           const normalizedY = (mouseY - centerY) / centerY;
           
-          // Ограничиваем максимальный поворот (в радианах) - увеличиваем амплитуду
-          const maxRotation = THREE.MathUtils.degToRad(30);
+          // Динамически изменяем максимальный поворот в зависимости от масштаба
+          // Чем больше голова, тем меньше она поворачивается
+          const scaleFactor = currentModelScale / MODEL_SCALE_BASE; // Фактор масштаба
+          const dynamicMaxRotation = BASE_MAX_ROTATION / scaleFactor; // Динамический поворот
+          const maxRotation = THREE.MathUtils.degToRad(Math.max(dynamicMaxRotation, MIN_MAX_ROTATION)); // Минимум 5 градусов
+          
           headRotationTarget.x = normalizedY * maxRotation; // Исправляем поворот вверх/вниз
           headRotationTarget.y = -normalizedX * maxRotation;  // Поворот влево/вправо
         }
