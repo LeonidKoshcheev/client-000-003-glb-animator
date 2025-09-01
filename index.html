@@ -87,6 +87,9 @@
       const scene = new THREE.Scene();
       scene.background = null;
 
+      // Настройки модели
+      const MODEL_SCALE = 4; // Масштаб модели (5 = стандартный размер)
+
       const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 1000);
       camera.position.set(0, 0, 30);
 
@@ -274,7 +277,7 @@
       const loader = new THREE.GLTFLoader();
       loader.load('model.glb',
         (gltf) => {
-          gltf.scene.scale.set(5, 5, 5);
+          gltf.scene.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
           scene.add(gltf.scene);
           
           mixer = new THREE.AnimationMixer(gltf.scene);
