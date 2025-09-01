@@ -95,6 +95,7 @@
       
       // Настройки смещения головы при загрузке
       const HEAD_OFFSET_X = 7; // Смещение головы вправо при загрузке
+      const HEAD_OFFSET_Y = -8; // Смещение головы вниз при загрузке
 
       const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 1000);
       camera.position.set(0, 0, 30);
@@ -107,8 +108,10 @@
         if (model) {
           // Смещаем камеру так, чтобы она была симметрична относительно смещенной модели
           camera.position.x = HEAD_OFFSET_X;
+          camera.position.y = HEAD_OFFSET_Y;
           originalCameraPosition.x = HEAD_OFFSET_X;
-          console.log('Камера смещена для компенсации смещения модели');
+          originalCameraPosition.y = HEAD_OFFSET_Y;
+          console.log('Камера смещена для компенсации смещения модели по X и Y');
         }
       }
 
@@ -344,6 +347,7 @@
               child.name.toLowerCase().includes('шея')
             )) {
               child.position.x += HEAD_OFFSET_X;
+              child.position.y += HEAD_OFFSET_Y;
               console.log('Найдена и смещена кость головы:', child.name);
               headFound = true;
             }
@@ -352,6 +356,7 @@
           if (!headFound) {
             // Если кость головы не найдена, смещаем всю модель
             model.position.x = HEAD_OFFSET_X;
+            model.position.y = HEAD_OFFSET_Y;
             console.log('Кость головы не найдена, смещена вся модель');
           }
           
